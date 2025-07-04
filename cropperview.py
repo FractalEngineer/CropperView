@@ -28,6 +28,9 @@ class CropperviewGUI:
         self.enable_crop = tk.BooleanVar(value=True)
         self.enable_superview = tk.BooleanVar(value=True)
         self.crop_values = tk.StringVar(value="0:0:144:148")
+        self.use_gpu_acceleration = tk.BooleanVar(value=False)
+        self.handbrake_encoder = tk.StringVar(value="x264")
+        self.superview_encoder = tk.StringVar(value="libx264")
         
         # Default paths
         self.input_folder.set("input_videos")
@@ -68,7 +71,13 @@ class CropperviewGUI:
         ttk.Label(input_frame, text="Input Folder:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
         input_entry = ttk.Entry(input_frame, textvariable=self.input_folder, width=50)
         input_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 5))
-        ttk.Button(input_frame, text="Browse", command=self.smart_browse).grid(row=0, column=2)
+        # Unified browse button with dropdown menu
+        browse_btn = ttk.Menubutton(input_frame, text="Browse")
+        browse_menu = tk.Menu(browse_btn, tearoff=0)
+        browse_menu.add_command(label="Select Files", command=self.browse_input_files)
+        browse_menu.add_command(label="Select Folder", command=self.browse_input_folder)
+        browse_btn["menu"] = browse_menu
+        browse_btn.grid(row=0, column=2)
         
         # File list
         file_frame = ttk.LabelFrame(main_frame, text="Detected Video Files", padding="10")
@@ -124,6 +133,31 @@ class CropperviewGUI:
         superview_check = ttk.Checkbutton(options_frame, text="Apply Superview", variable=self.enable_superview)
         superview_check.grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(0, 5))
         
+        # GPU Acceleration section (expand/collapse)
+        gpu_frame = ttk.LabelFrame(options_frame, text="GPU Acceleration", padding="5")
+        gpu_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        # Enable GPU acceleration
+        gpu_check = ttk.Checkbutton(gpu_frame, text="Use GPU acceleration", variable=self.use_gpu_acceleration, command=self.toggle_gpu_options)
+        gpu_check.grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=(0, 5))
+        
+        # HandBrake encoder selection
+        self.handbrake_encoder_label = ttk.Label(gpu_frame, text="HandBrake Encoder:")
+        self.handbrake_encoder_combo = ttk.Combobox(gpu_frame, textvariable=self.handbrake_encoder, width=15, state="readonly")
+        self.handbrake_encoder_combo['values'] = ('x264', 'x265', 'h264_nvenc', 'hevc_nvenc', 'h264_qsv', 'hevc_qsv')
+        
+        # Superview encoder selection
+        self.superview_encoder_label = ttk.Label(gpu_frame, text="Superview Encoder:")
+        self.superview_encoder_combo = ttk.Combobox(gpu_frame, textvariable=self.superview_encoder, width=15, state="readonly")
+        self.superview_encoder_combo['values'] = ('libx264', 'libx265', 'h264_nvenc', 'hevc_nvenc', 'h264_qsv', 'hevc_qsv')
+        
+        # GPU info label
+        self.gpu_info_label = ttk.Label(gpu_frame, text="Note: GPU encoders require compatible hardware (NVIDIA, Intel QSV, etc.)", 
+                                 font=("Arial", 8), foreground="gray")
+        
+        # Initially hide GPU options
+        self.toggle_gpu_options()
+        
         # Process button
         process_btn = ttk.Button(main_frame, text="Start Processing", command=self.start_processing)
         process_btn.grid(row=5, column=0, columnspan=3, pady=(10, 0))
@@ -134,8 +168,13 @@ class CropperviewGUI:
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
         
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=80)
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=80, autoseparators=True)
         self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.log_text.bind('<Button-1>', self._log_user_scrolled)
+        self.log_text.bind('<MouseWheel>', self._log_user_scrolled)
+        self._log_user_is_at_bottom = True
+        self.log_text.bind('<Key>', self._log_user_scrolled)
+        self.log_text.bind('<ButtonRelease-1>', self._log_user_scrolled)
         
         # Progress bar
         self.progress_var = tk.DoubleVar()
@@ -154,6 +193,26 @@ class CropperviewGUI:
         else:
             self.output_entry.config(state='normal')
             self.output_browse_btn.config(state='normal')
+    
+    def toggle_gpu_options(self):
+        # Show/hide GPU encoder options based on checkbox
+        if self.use_gpu_acceleration.get():
+            self.handbrake_encoder_label.grid(row=1, column=0, sticky=tk.W, padx=(20, 5))
+            self.handbrake_encoder_combo.grid(row=1, column=1, sticky=tk.W, pady=(0, 5))
+            self.superview_encoder_label.grid(row=2, column=0, sticky=tk.W, padx=(20, 5))
+            self.superview_encoder_combo.grid(row=2, column=1, sticky=tk.W, pady=(0, 5))
+            self.gpu_info_label.grid(row=3, column=0, columnspan=2, sticky=tk.W, padx=(20, 0), pady=(5, 0))
+        else:
+            self.handbrake_encoder_label.grid_remove()
+            self.handbrake_encoder_combo.grid_remove()
+            self.superview_encoder_label.grid_remove()
+            self.superview_encoder_combo.grid_remove()
+            self.gpu_info_label.grid_remove()
+    
+    def _log_user_scrolled(self, event=None):
+        # Check if user is at the bottom of the log
+        last_visible = self.log_text.yview()[1]
+        self._log_user_is_at_bottom = (last_visible >= 0.999)
     
     def smart_browse(self):
         """Smart browse that allows selecting both folders and individual files"""
@@ -263,7 +322,8 @@ class CropperviewGUI:
     def log_message(self, message):
         timestamp = time.strftime("%H:%M:%S")
         self.log_text.insert(tk.END, f"[{timestamp}] {message}\n")
-        self.log_text.see(tk.END)
+        if getattr(self, '_log_user_is_at_bottom', True):
+            self.log_text.see(tk.END)
         self.root.update_idletasks()
     
     def start_processing(self):
@@ -374,18 +434,28 @@ class CropperviewGUI:
         if not handbrake_path.exists():
             raise FileNotFoundError(f"HandBrake executable not found at: {handbrake_path}")
         
+        # Build command with encoder selection
         cmd = [
             str(handbrake_path),
             "--input-list", str(file_list_path),
             "--output", str(output_file),
             "--format", "mp4",
-            "--encoder", "x264",
+            "--encoder", self.handbrake_encoder.get(),
             "--quality", "20"
         ]
+        
+        # Add GPU-specific parameters if using GPU acceleration
+        if self.use_gpu_acceleration.get():
+            encoder = self.handbrake_encoder.get()
+            if encoder in ['h264_nvenc', 'hevc_nvenc']:
+                cmd.extend(["--encopts", "preset=fast"])
+            elif encoder in ['h264_qsv', 'hevc_qsv']:
+                cmd.extend(["--encopts", "preset=fast"])
         
         self.log_message(f"Running HandBrake command: {' '.join(cmd)}")
         self.log_message(f"Working directory: {os.getcwd()}")
         self.log_message(f"HandBrake path exists: {handbrake_path.exists()}")
+        self.log_message(f"Using encoder: {self.handbrake_encoder.get()}")
         
         try:
             # Use Popen for real-time output with hidden window
@@ -427,19 +497,29 @@ class CropperviewGUI:
         if not handbrake_path.exists():
             raise FileNotFoundError(f"HandBrake executable not found at: {handbrake_path}")
         
+        # Build command with encoder selection
         cmd = [
             str(handbrake_path),
             "--input", str(input_file),
             "--output", str(output_file),
             "--format", "mp4",
-            "--encoder", "x264",
+            "--encoder", self.handbrake_encoder.get(),
             "--quality", "20",
             "--crop", f"{top}:{bottom}:{left}:{right}"
         ]
         
+        # Add GPU-specific parameters if using GPU acceleration
+        if self.use_gpu_acceleration.get():
+            encoder = self.handbrake_encoder.get()
+            if encoder in ['h264_nvenc', 'hevc_nvenc']:
+                cmd.extend(["--encopts", "preset=fast"])
+            elif encoder in ['h264_qsv', 'hevc_qsv']:
+                cmd.extend(["--encopts", "preset=fast"])
+        
         self.log_message(f"Running crop command: {' '.join(cmd)}")
         self.log_message(f"Working directory: {os.getcwd()}")
         self.log_message(f"HandBrake path exists: {handbrake_path.exists()}")
+        self.log_message(f"Using encoder: {self.handbrake_encoder.get()}")
         
         try:
             # Use Popen for real-time output with hidden window
@@ -474,15 +554,22 @@ class CropperviewGUI:
         if not superview_path.exists():
             raise FileNotFoundError(f"Superview executable not found at: {superview_path}")
         
+        # Build command with encoder selection
         cmd = [
             str(superview_path),
             "/i", str(input_file),
             "/o", str(output_file)
         ]
         
+        # Add encoder parameter if using GPU acceleration
+        if self.use_gpu_acceleration.get():
+            cmd.extend(["/e", self.superview_encoder.get()])
+        
         self.log_message(f"Running Superview command: {' '.join(cmd)}")
         self.log_message(f"Working directory: {os.getcwd()}")
         self.log_message(f"Superview path exists: {superview_path.exists()}")
+        if self.use_gpu_acceleration.get():
+            self.log_message(f"Using encoder: {self.superview_encoder.get()}")
         
         try:
             # Use Popen for real-time output with hidden window
@@ -527,15 +614,19 @@ class CropperviewGUI:
             if os.path.exists("settings.json"):
                 with open("settings.json", "r") as f:
                     settings = json.load(f)
-                    
                 self.input_folder.set(settings.get("input_folder", "input_videos"))
                 self.output_folder.set(settings.get("output_folder", "output_videos"))
                 self.crop_values.set(settings.get("crop_values", "0:0:144:148"))
                 self.enable_crop.set(settings.get("enable_crop", True))
                 self.enable_superview.set(settings.get("enable_superview", True))
                 self.combine_videos.set(settings.get("combine_videos", True))
+                self.use_gpu_acceleration.set(settings.get("use_gpu_acceleration", False))
+                self.handbrake_encoder.set(settings.get("handbrake_encoder", "x264"))
+                self.superview_encoder.set(settings.get("superview_encoder", "libx264"))
         except Exception as e:
             self.log_message(f"Could not load settings: {e}")
+        # Always update GPU options visibility after loading settings
+        self.toggle_gpu_options()
     
     def save_settings(self):
         try:
@@ -545,7 +636,10 @@ class CropperviewGUI:
                 "crop_values": self.crop_values.get(),
                 "enable_crop": self.enable_crop.get(),
                 "enable_superview": self.enable_superview.get(),
-                "combine_videos": self.combine_videos.get()
+                "combine_videos": self.combine_videos.get(),
+                "use_gpu_acceleration": self.use_gpu_acceleration.get(),
+                "handbrake_encoder": self.handbrake_encoder.get(),
+                "superview_encoder": self.superview_encoder.get()
             }
             
             with open("settings.json", "w") as f:

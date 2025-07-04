@@ -63,6 +63,9 @@ See [SETUP.md](SETUP.md) for detailed instructions.
 - **Crop Videos**: Enable/disable video cropping with custom dimensions
 - **Crop Values**: Format is `top:bottom:left:right` (default: 0:0:144:148)
 - **Apply Superview**: Enable/disable Superview processing
+- **GPU Acceleration**: Enable hardware acceleration for faster processing
+  - **HandBrake Encoder**: Choose between CPU (x264/x265) or GPU encoders (NVIDIA NVENC, Intel QSV)
+  - **Superview Encoder**: Select encoder for Superview processing
 
 ### 4. Processing
 - Click "Start Processing" to begin
@@ -161,6 +164,25 @@ The crop format is `top:bottom:left:right` where:
 - `bottom`: Pixels to crop from the bottom
 - `left`: Pixels to crop from the left
 - `right`: Pixels to crop from the right
+
+### GPU Acceleration
+Enable hardware acceleration for significantly faster processing:
+
+#### HandBrake Encoders:
+- **x264/x265**: CPU-based encoding (default, compatible with all systems)
+- **h264_nvenc/hevc_nvenc**: NVIDIA GPU acceleration (requires NVIDIA GPU)
+- **h264_qsv/hevc_qsv**: Intel Quick Sync acceleration (requires Intel CPU with QSV)
+
+#### Superview Encoders:
+- **libx264/libx265**: CPU-based encoding (default)
+- **h264_nvenc/hevc_nvenc**: NVIDIA GPU acceleration
+- **h264_qsv/hevc_qsv**: Intel Quick Sync acceleration
+
+#### Performance Tips:
+- GPU acceleration can provide 2-5x faster encoding
+- NVIDIA NVENC is generally the fastest option
+- Intel QSV provides good performance with lower power consumption
+- CPU encoding provides the best quality but is slower
 
 ### Batch Processing
 - Place multiple video files in the input folder
