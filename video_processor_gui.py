@@ -68,7 +68,10 @@ class CropperviewGUI:
         ttk.Label(input_frame, text="Input Folder:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
         input_entry = ttk.Entry(input_frame, textvariable=self.input_folder, width=50)
         input_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 5))
-        ttk.Button(input_frame, text="Browse", command=self.smart_browse).grid(row=0, column=2)
+        ttk.Button(input_frame, text="Browse Folder", command=self.browse_input_folder).grid(row=0, column=2)
+        
+        # Add file selection button
+        ttk.Button(input_frame, text="Select Files", command=self.browse_input_files).grid(row=1, column=2, pady=(5, 0))
         
         # File list
         file_frame = ttk.LabelFrame(main_frame, text="Detected Video Files", padding="10")
@@ -155,34 +158,6 @@ class CropperviewGUI:
             self.output_entry.config(state='normal')
             self.output_browse_btn.config(state='normal')
     
-    def smart_browse(self):
-        """Smart browse that allows selecting both folders and individual files"""
-        # Create a custom dialog to choose between folder and file selection
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Select Input")
-        dialog.geometry("300x150")
-        dialog.resizable(False, False)
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        # Center the dialog
-        dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 50, self.root.winfo_rooty() + 50))
-        
-        # Add buttons
-        ttk.Label(dialog, text="Choose input method:", font=("Arial", 12)).pack(pady=20)
-        
-        ttk.Button(dialog, text="Select Folder", 
-                  command=lambda: [self.browse_input_folder(), dialog.destroy()]).pack(pady=5)
-        
-        ttk.Button(dialog, text="Select Individual Files", 
-                  command=lambda: [self.browse_input_files(), dialog.destroy()]).pack(pady=5)
-        
-        ttk.Button(dialog, text="Cancel", 
-                  command=dialog.destroy).pack(pady=5)
-        
-        # Wait for dialog to close
-        dialog.wait_window()
-    
     def browse_input_folder(self):
         folder = filedialog.askdirectory(title="Select Input Folder")
         if folder:
@@ -195,12 +170,11 @@ class CropperviewGUI:
     def browse_input_files(self):
         """Browse for individual video files"""
         video_extensions = [
-            ("Video files", "*.mp4 *.avi *.mov *.mkv *.wmv *.flv *.webm *.m4v *.ts"),
+            ("Video files", "*.mp4 *.avi *.mov *.mkv *.wmv *.flv *.webm *.m4v"),
             ("MP4 files", "*.mp4"),
             ("AVI files", "*.avi"),
             ("MOV files", "*.mov"),
             ("MKV files", "*.mkv"),
-            ("TS files", "*.ts"),
             ("All files", "*.*")
         ]
         
@@ -242,7 +216,7 @@ class CropperviewGUI:
             messagebox.showerror("Error", f"Input folder does not exist: {input_path}")
             return
         
-        video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.ts'}
+        video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'}
         self.input_files = []
         
         for file_path in input_path.rglob('*'):
@@ -349,15 +323,6 @@ class CropperviewGUI:
             self.log_message(f"Error during processing: {str(e)}")
             messagebox.showerror("Error", f"Processing failed: {str(e)}")
     
-    def get_startupinfo(self):
-        """Get startupinfo to hide console windows on Windows"""
-        startupinfo = None
-        if os.name == 'nt':  # Windows
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-        return startupinfo
-    
     def combine_videos_handbrake(self, temp_path):
         # Create a file list for HandBrake
         file_list_path = temp_path / "file_list.txt"
@@ -388,10 +353,9 @@ class CropperviewGUI:
         self.log_message(f"HandBrake path exists: {handbrake_path.exists()}")
         
         try:
-            # Use Popen for real-time output with hidden window
+            # Use Popen for real-time output
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-                                     text=True, cwd=str(self.script_dir), bufsize=1, universal_newlines=True,
-                                     startupinfo=self.get_startupinfo())
+                                     text=True, cwd=str(self.script_dir), bufsize=1, universal_newlines=True)
             
             for line in process.stdout:
                 if line.strip():
@@ -442,10 +406,9 @@ class CropperviewGUI:
         self.log_message(f"HandBrake path exists: {handbrake_path.exists()}")
         
         try:
-            # Use Popen for real-time output with hidden window
+            # Use Popen for real-time output
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-                                     text=True, cwd=str(self.script_dir), bufsize=1, universal_newlines=True,
-                                     startupinfo=self.get_startupinfo())
+                                     text=True, cwd=str(self.script_dir), bufsize=1, universal_newlines=True)
             
             for line in process.stdout:
                 if line.strip():
@@ -485,10 +448,9 @@ class CropperviewGUI:
         self.log_message(f"Superview path exists: {superview_path.exists()}")
         
         try:
-            # Use Popen for real-time output with hidden window
+            # Use Popen for real-time output
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-                                     text=True, cwd=str(self.script_dir), bufsize=1, universal_newlines=True,
-                                     startupinfo=self.get_startupinfo())
+                                     text=True, cwd=str(self.script_dir), bufsize=1, universal_newlines=True)
             
             for line in process.stdout:
                 if line.strip():

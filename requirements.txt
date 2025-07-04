@@ -1,0 +1,9 @@
+# Video Processor GUI Requirements
+# Most dependencies are built-in Python modules
+# Only external dependencies if needed for enhanced functionality
+
+# For better GUI styling (optional)
+# ttkthemes
+
+# For video file detection (optional enhancement)
+# python-magic 

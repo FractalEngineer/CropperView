@@ -1,3 +1,40 @@
 # Video Files
 *.mp4
 *.ts
+
+# Large executable files (should be downloaded separately)
+HandBrakeCLI.exe
+superview-cli.exe
+
+# Temporary files and directories
+temp/
+*.tmp
+*.temp
+
+# Output directories
+output_videos/
+temp/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Settings file (contains user-specific paths)
+settings.json
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
